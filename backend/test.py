@@ -7,7 +7,7 @@ import zipfile
 
 client = TestClient(app)
 
-DATA_DIR = "data/project"
+DATA_DIR = "../data/project"
 
 def setup_function():
     """ setup any state specific to the execution of the given function."""
