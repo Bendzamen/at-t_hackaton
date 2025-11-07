@@ -1,12 +1,13 @@
 'use client';
+
 import { useSearchParams } from 'next/navigation';
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
 export interface StatusEntry {
   stage: string;
   message: string;
   index: number;
-  zip?: string;
+  zip_result?: string;
 }
 
 export type StatusBlock = string | StatusEntry[];
@@ -17,7 +18,7 @@ export interface ChatMessage {
   message: string;
   index: number;
   timestamp: number;
-  zip?: string;
+  zip_result?: string;
 }
 
 interface StatusContextProps {
@@ -40,6 +41,7 @@ export const StatusProvider = ({ children }: { children: ReactNode }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [zipData, setZipData] = useState<string | undefined>(undefined);
+  console.log(zipData, 'ZZZ');
   const [isPolling, setIsPolling] = useState(false);
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
   const searchParams = useSearchParams();
@@ -58,26 +60,34 @@ export const StatusProvider = ({ children }: { children: ReactNode }) => {
 
     const pollInterval = setInterval(async () => {
       try {
-        const response = await fetch('/api/status', {
-          method: 'POST',
+        const response = await fetch('http://localhost:3333/status', {
+          method: 'GET',
           headers: { 'Content-Type': 'application/json' },
         });
 
+        console.log('RES', response);
+
         if (!response.ok) throw new Error('Failed to fetch status');
 
-        const result: { data: StatusBlock[] } = await response.json();
+        const result: StatusBlock[] = await response.json();
+
+        console.log('RRR', result);
 
         const flattened: ChatMessage[] = [];
         let latestZip: string | undefined;
 
-        result.data.forEach((block, blockIdx) => {
+        result.forEach((block, blockIdx) => {
           if (typeof block === 'string') {
-            flattened.push({
-              type: 'user',
-              message: block,
-              index: flattened.length,
-              timestamp: Date.now() + blockIdx,
-            });
+            const exists = flattened.flatMap((m) => m.message).includes(block);
+
+            if (!exists) {
+              flattened.push({
+                type: 'user',
+                message: block,
+                index: flattened.length,
+                timestamp: Date.now() + blockIdx,
+              });
+            }
           } else if (Array.isArray(block)) {
             block.forEach((entry) => {
               flattened.push({
@@ -86,9 +96,9 @@ export const StatusProvider = ({ children }: { children: ReactNode }) => {
                 message: entry.message,
                 index: entry.index,
                 timestamp: Date.now() + entry.index + blockIdx * 10,
-                zip: entry.zip,
+                zip_result: entry.zip_result,
               });
-              if (entry.zip) latestZip = entry.zip;
+              if (entry.zip_result) latestZip = entry.zip_result;
             });
           }
         });
@@ -120,7 +130,7 @@ export const StatusProvider = ({ children }: { children: ReactNode }) => {
   const handleDownloadZip = () => {
     if (!zipData) return;
     const link = document.createElement('a');
-    link.href = zipData;
+    link.href = `http://localhost:3333${zipData}`;
     link.download = 'project.zip';
     document.body.appendChild(link);
     link.click();

@@ -89,7 +89,9 @@ export default function FileUploadPage() {
       const formData = new FormData();
       formData.append('file', fileToUpload);
 
-      const response = await fetch('/api/start', {
+      const fileName = `${Date.now()}-${file.name}`;
+
+      const response = await fetch('http://localhost:3333/start', {
         method: 'POST',
         body: formData,
       });
@@ -108,7 +110,7 @@ export default function FileUploadPage() {
       setUploadSuccess(true);
 
       setTimeout(() => {
-        router.push(`/chat?file=${encodeURIComponent(data.fileName)}`);
+        router.push(`/chat?file=${encodeURIComponent(fileName)}`);
       }, 1500);
     } catch (err) {
       console.error(' Upload error:', err);
