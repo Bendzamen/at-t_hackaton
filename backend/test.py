@@ -1,8 +1,7 @@
-
 import os
 import shutil
 from fastapi.testclient import TestClient
-from main import app
+from main import app, projects
 
 client = TestClient(app)
 
@@ -13,6 +12,7 @@ def setup_function():
     if os.path.exists(DATA_DIR):
         shutil.rmtree(DATA_DIR)
     os.makedirs(DATA_DIR)
+    projects.clear()
 
 def teardown_function():
     """ teardown any state that was previously setup with a setup_function
@@ -64,3 +64,34 @@ def test_get_status_found():
     assert "history" in json_response
     assert len(json_response["history"]) == 1
     assert json_response["history"][0] == "Initial PDF submission"
+
+def test_add_status():
+    # First create a project
+    with open("test.pdf", "wb") as f:
+        f.write(b"This is a test pdf.")
+    
+    with open("test.pdf", "rb") as f:
+        response = client.post("/start", files={"file": ("test.pdf", f, "application/pdf")})
+    
+    os.remove("test.pdf")
+    project_id = response.json()["project_id"]
+
+    # Add a status
+    project = projects[project_id]
+    project.add_status(stage="test_stage", message="test_message")
+
+    # Now get the status
+    response = client.post("/status", json={"project_id": project_id})
+    assert response.status_code == 200
+    json_response = response.json()
+    assert len(json_response["history"]) == 2
+    assert json_response["history"][0] == "Initial PDF submission"
+    iteration = json_response["history"][1]
+    assert "status_list" in iteration
+    assert "commit_id" in iteration
+    assert iteration["commit_id"] is None
+    assert len(iteration["status_list"]) == 1
+    status = iteration["status_list"][0]
+    assert status["stage"] == "test_stage"
+    assert status["message"] == "test_message"
+    assert status["index"] == 0

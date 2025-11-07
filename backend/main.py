@@ -1,4 +1,5 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi.encoders import jsonable_encoder
 import os
 from project import Project
 from pydantic import BaseModel
@@ -19,6 +20,10 @@ def load_projects():
 @app.on_event("startup")
 async def startup_event():
     load_projects()
+
+@app.post('/projects')
+async def list_projects():
+    return list(projects.keys())
 
 @app.post("/start")
 async def start_processing(file: UploadFile = File(...)):
@@ -42,7 +47,7 @@ async def get_status(request: StatusRequest):
     project = projects.get(request.project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-    return {"project_id": project.uuid, "history": project.history}
+    return {"project_id": project.uuid, "history": jsonable_encoder(project.history)}
 
 if __name__ == "__main__":
     import uvicorn
