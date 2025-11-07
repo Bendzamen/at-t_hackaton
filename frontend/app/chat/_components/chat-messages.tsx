@@ -17,7 +17,7 @@ export const ChatPanel = () => {
   return (
     <div className="flex-1 flex flex-col border-r border-border h-full">
       {/* Header */}
-      <div className="p-6 border-b border-border bg-background sticky top-16 z-10 shrink-0">
+      <div className="p-6 border-b border-border bg-background">
         <h1 className="text-2xl font-bold text-foreground flex gap-1 items-center">
           <Image src="/logo.png" alt="S Logo" width={32} height={32} />
           <span className="font-bold text-lg text-foreground">lopify</span>
