@@ -1,22 +1,23 @@
-// context/StatusContext.tsx
 'use client';
-
 import { useSearchParams } from 'next/navigation';
-import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
-export interface StatusResponse {
+export interface StatusEntry {
   stage: string;
   message: string;
-  zip?: string;
-  preview?: string;
   index: number;
+  zip?: string;
 }
 
+export type StatusBlock = string | StatusEntry[];
+
 export interface ChatMessage {
-  stage: string;
+  type: 'user' | 'status';
+  stage?: string;
   message: string;
   index: number;
   timestamp: number;
+  zip?: string;
 }
 
 interface StatusContextProps {
@@ -36,117 +37,88 @@ export const useStatus = () => {
 };
 
 export const StatusProvider = ({ children }: { children: ReactNode }) => {
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      stage: 'Starting',
-      message: 'Calling project owner agent',
-      index: 0,
-      timestamp: Date.now(),
-    },
-  ]);
-  const [currentIndex, setCurrentIndex] = useState(-1);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [zipData, setZipData] = useState<string | undefined>(undefined);
   const [isPolling, setIsPolling] = useState(false);
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
-  const [projectId, setProjectId] = useState<string | null>(null);
   const searchParams = useSearchParams();
 
   useEffect(() => {
     const file = searchParams.get('file');
-    if (file) {
-      setUploadedFileName(decodeURIComponent(file));
-    }
+    if (file) setUploadedFileName(decodeURIComponent(file));
   }, [searchParams]);
 
   useEffect(() => {
-    const initializeProject = async () => {
-      try {
-        console.log(' Calling /start API');
-        const response = await fetch('/api/start', {
-          method: 'POST',
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to start project');
-        }
-
-        const data = await response.json();
-        console.log(' Project started with ID:', data.projectId);
-        setProjectId(data.projectId);
-        setIsPolling(true);
-      } catch (error) {
-        console.error('Error initializing project:', error);
-      }
-    };
-
-    initializeProject();
+    setIsPolling(true);
   }, []);
 
   useEffect(() => {
-    if (!isPolling || !projectId) return;
+    if (!isPolling) return;
 
     const pollInterval = setInterval(async () => {
       try {
-        console.log(' Polling status for projectId:', projectId);
         const response = await fetch('/api/status', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ projectId }),
+          headers: { 'Content-Type': 'application/json' },
         });
 
-        if (!response.ok) {
-          throw new Error('Failed to fetch status');
-        }
+        if (!response.ok) throw new Error('Failed to fetch status');
 
-        const data = await response.json();
-        console.log(' Status response:', data);
+        const result: { data: StatusBlock[] } = await response.json();
 
-        if (data.index > currentIndex) {
-          // New message received
-          setCurrentIndex(data.index);
-          setMessages((prev) => [
-            ...prev,
-            {
-              stage: data.stage,
-              message: data.message,
-              index: data.index,
-              timestamp: Date.now(),
-            },
-          ]);
-          setIsLoading(false);
+        const flattened: ChatMessage[] = [];
+        let latestZip: string | undefined;
 
-          if (data.zip) {
-            setZipData(data.zip);
-            setIsPolling(false);
+        result.data.forEach((block, blockIdx) => {
+          if (typeof block === 'string') {
+            flattened.push({
+              type: 'user',
+              message: block,
+              index: flattened.length,
+              timestamp: Date.now() + blockIdx,
+            });
+          } else if (Array.isArray(block)) {
+            block.forEach((entry) => {
+              flattened.push({
+                type: 'status',
+                stage: entry.stage,
+                message: entry.message,
+                index: entry.index,
+                timestamp: Date.now() + entry.index + blockIdx * 10,
+                zip: entry.zip,
+              });
+              if (entry.zip) latestZip = entry.zip;
+            });
           }
-        } else if (data.index === currentIndex) {
-          // Same index - show loading indicator
+        });
+
+        // Keep messages in chronological order and avoid duplicates
+        setMessages((prev) => {
+          const combined = [...prev, ...flattened];
+          const unique = Array.from(new Map(combined.map((m) => [`${m.type}-${m.index}-${m.message}`, m])).values());
+          return unique.sort((a, b) => a.timestamp - b.timestamp);
+        });
+
+        setZipData(latestZip);
+
+        if (latestZip) {
+          setIsPolling(false);
+          setIsLoading(false);
+        } else {
           setIsLoading(true);
         }
       } catch (error) {
         console.error('Error polling status:', error);
-        setMessages((prev) => [
-          ...prev,
-          {
-            stage: 'Error',
-            message: 'Something went wrong',
-            index: 0,
-            timestamp: Date.now(),
-          },
-        ]);
         setIsPolling(false);
       }
-    }, 5000);
+    }, 3000);
 
     return () => clearInterval(pollInterval);
-  }, [currentIndex, isPolling, projectId]);
+  }, [isPolling]);
 
   const handleDownloadZip = () => {
     if (!zipData) return;
-
     const link = document.createElement('a');
     link.href = zipData;
     link.download = 'project.zip';
