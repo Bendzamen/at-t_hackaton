@@ -3,7 +3,7 @@ import json
 import subprocess
 from typing import List, Dict, Union
 
-DATA_DIR = "data/project"
+DATA_DIR = "../data/project"
 
 class Iteration:
     def __init__(self, commit_id: str = None, project_dir: str = None):
