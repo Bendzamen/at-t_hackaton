@@ -1,7 +1,7 @@
 .env
-.venv
 .DS_Store
 __pycache__
+components/.venv/
 
 # Langflow data (contains user-specific database files)
 data/

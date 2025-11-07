@@ -13,8 +13,6 @@ services:
       - ./components:/app/components
       - ./workspace:/app/workspace
       - ./data:/app/data
-      - ./uploads:/app/uploads
-      
     security_opt:
       - no-new-privileges:true
     ulimits:
