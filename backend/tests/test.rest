@@ -23,3 +23,15 @@ Content-Type: application/json
     "stage": "test_stage",
     "message": "test_message"
 }
+
+###
+# Mark iteration as done
+POST http://localhost:3333/iteration-done
+
+###
+# Download the code as a zip file
+GET http://localhost:3333/zip-download
+
+###
+# Undo the last commit
+POST http://localhost:3333/undo

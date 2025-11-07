@@ -80,3 +80,10 @@ class Project:
         }
         iteration.status_list.append(status)
         self.save_history()
+
+    def rollback(self):
+        if self.history and isinstance(self.history[-1], Iteration):
+            iteration = self.history.pop()
+            if iteration.commit_id:
+                subprocess.run(["git", "reset", "--hard", "HEAD~1"], cwd=self.code_dir)
+            self.save_history()

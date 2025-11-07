@@ -1,26 +1,39 @@
 # API Endpoints
 
-## GET /projects
-
-Lists all project IDs.
-
 ## POST /start
 
 Initiates a new project from a PDF file.
 
 - **Request:** `multipart/form-data` with a `file` field containing the PDF.
-- **Response:** `{"project_id": "<uuid>"}`
+- **Response:** `{"message": "Processing started"}`
 
-## POST /status
+## GET /status
 
-Retrieves the history of a project.
+Retrieves the history of the project.
 
-- **Request:** `{"project_id": "<uuid>"}`
 - **Response:** A JSON array representing the project's history.
 
 ## POST /update-status
 
-Adds a status update to a project's latest iteration.
+Adds a status update to the project's latest iteration.
 
-- **Request:** `{"project_id": "<uuid>", "stage": "<string>", "message": "<string>"}`
+- **Request:** `{"stage": "<string>", "message": "<string>"}`
 - **Response:** `{"message": "Status updated successfully"}`
+
+## POST /iteration-done
+
+Marks the current iteration as complete, commits the code, and provides a download link for the code.
+
+- **Response:** `{"message": "Iteration marked as done"}`
+
+## GET /zip-download
+
+Downloads a zip file of the `code` folder.
+
+- **Response:** A zip file of the `code` directory.
+
+## POST /undo
+
+Rolls back the last commit and removes the last iteration from the history.
+
+- **Response:** `{"message": "Rolled back to the previous commit"}`

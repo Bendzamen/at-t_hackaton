@@ -1,4 +1,3 @@
-
 import os
 import shutil
 from fastapi.testclient import TestClient
@@ -150,3 +149,29 @@ def test_zip_download(mock_trigger_langflow):
     
     with zipfile.ZipFile("code.zip", 'r') as zip_ref:
         assert "test.txt" in zip_ref.namelist()
+
+@patch('main.trigger_langflow_with_file')
+def test_undo(mock_trigger_langflow):
+    # First create a project
+    with open("test.pdf", "wb") as f:
+        f.write(b"This is a test pdf.")
+    
+    with open("test.pdf", "rb") as f:
+        client.post("/start", files={"file": ("test.pdf", f, "application/pdf")})
+    
+    os.remove("test.pdf")
+
+    # Mark iteration as done
+    client.post("/iteration-done")
+
+    # Undo the last commit
+    response = client.post("/undo")
+    assert response.status_code == 200
+    assert response.json() == {"message": "Rolled back to the previous commit"}
+
+    # Check the status
+    response = client.get("/status")
+    assert response.status_code == 200
+    json_response = response.json()
+    assert len(json_response) == 1
+    assert json_response[0] == "Initial PDF submission"

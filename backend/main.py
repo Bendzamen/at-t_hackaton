@@ -57,6 +57,11 @@ async def zip_download():
     shutil.make_archive("code", 'zip', project.code_dir)
     return FileResponse("code.zip", media_type='application/zip', filename='code.zip')
 
+@app.post("/undo")
+async def undo():
+    project.rollback()
+    return {"message": "Rolled back to the previous commit"}
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=3333)
