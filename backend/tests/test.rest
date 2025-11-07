@@ -1,0 +1,37 @@
+###
+# Start a new project by uploading a PDF file
+POST http://localhost:3333/start
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="file"; filename="test.pdf"
+Content-Type: application/pdf
+
+< ./test.pdf
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+
+###
+# Get the status of a project
+GET http://localhost:3333/status
+
+###
+# Update the status of a project
+POST http://localhost:3333/update-status
+Content-Type: application/json
+
+{
+    "stage": "test_stage",
+    "message": "test_message"
+}
+
+###
+# Mark iteration as done
+POST http://localhost:3333/iteration-done
+
+###
+# Download the code as a zip file
+GET http://localhost:3333/zip-download
+
+###
+# Undo the last commit
+POST http://localhost:3333/undo
