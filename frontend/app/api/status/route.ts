@@ -60,7 +60,9 @@ export async function POST(request: NextRequest) {
       progress.lastUpdated = Date.now();
     }
 
-    const response = mockResponses[Math.min(progress.currentIndex, mockResponses.length - 1)];
+    // Ensure we always return a valid response
+    const safeIndex = Math.max(progress.currentIndex, 0);
+    const response = mockResponses[safeIndex];
 
     console.log(` Status for ${projectId}:`, response);
 
