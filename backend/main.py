@@ -1,35 +1,48 @@
-
-from fastapi import FastAPI, File, UploadFile
-import uuid
+from fastapi import FastAPI, File, UploadFile, HTTPException
 import os
+from project import Project
+from pydantic import BaseModel
 
 app = FastAPI()
 
 DATA_DIR = "data/projects"
-os.makedirs(DATA_DIR, exist_ok=True)
+projects: dict[str, Project] = {}
 
+def load_projects():
+    if not os.path.exists(DATA_DIR):
+        os.makedirs(DATA_DIR)
+    for project_id in os.listdir(DATA_DIR):
+        if os.path.isdir(os.path.join(DATA_DIR, project_id)):
+            project = Project(project_id=project_id)
+            projects[project_id] = project
+
+@app.on_event("startup")
+async def startup_event():
+    load_projects()
 
 @app.post("/start")
 async def start_processing(file: UploadFile = File(...)):
-    file_id = str(uuid.uuid4())
-    file_path = os.path.join(DATA_DIR, f"{file_id}.pdf")
+    project = Project()
+    projects[project.uuid] = project
+    
+    file_path = os.path.join(project.project_dir, "concept.pdf")
     
     with open(file_path, "wb") as buffer:
         buffer.write(await file.read())
+        
+    project.add_prompt("Initial PDF submission")
     
-    return {"file_id": file_id, "file_path": file_path}
+    return {"project_id": project.uuid}
 
-@app.get("/status")
-async def get_status():
-    return {
-        "stage": "example stage",
-        "message": "lorem ipsum",
-        "i": 0
-    }
+class StatusRequest(BaseModel):
+    project_id: str
 
-
-
-
+@app.post("/status")
+async def get_status(request: StatusRequest):
+    project = projects.get(request.project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return {"project_id": project.uuid, "history": project.history}
 
 if __name__ == "__main__":
     import uvicorn
