@@ -3,33 +3,14 @@ from fastapi.encoders import jsonable_encoder
 import os
 from project import Project
 from pydantic import BaseModel
+from langflow_client import trigger_langflow_with_file
 
 app = FastAPI()
 
-DATA_DIR = "data/projects"
-projects: dict[str, Project] = {}
-
-def load_projects():
-    if not os.path.exists(DATA_DIR):
-        os.makedirs(DATA_DIR)
-    for project_id in os.listdir(DATA_DIR):
-        if os.path.isdir(os.path.join(DATA_DIR, project_id)):
-            project = Project(project_id=project_id)
-            projects[project_id] = project
-
-@app.on_event("startup")
-async def startup_event():
-    load_projects()
-
-@app.post('/projects')
-async def list_projects():
-    return list(projects.keys())
+project = Project()
 
 @app.post("/start")
 async def start_processing(file: UploadFile = File(...)):
-    project = Project()
-    projects[project.uuid] = project
-    
     file_path = os.path.join(project.project_dir, "concept.pdf")
     
     with open(file_path, "wb") as buffer:
@@ -37,17 +18,24 @@ async def start_processing(file: UploadFile = File(...)):
         
     project.add_prompt("Initial PDF submission")
     
-    return {"project_id": project.uuid}
+    # Trigger Langflow
+    trigger_langflow_with_file(file_path, project.code_dir)
+    project.add_prompt(f"Sent to langflow with code_dir: {project.code_dir}")
 
-class StatusRequest(BaseModel):
-    project_id: str
+    return {"message": "Processing started"}
 
-@app.post("/status")
-async def get_status(request: StatusRequest):
-    project = projects.get(request.project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    return {"project_id": project.uuid, "history": jsonable_encoder(project.history)}
+@app.get("/status")
+async def get_status():
+    return jsonable_encoder(project.history)
+
+class UpdateStatusRequest(BaseModel):
+    stage: str
+    message: str
+
+@app.post("/update-status")
+async def update_status(request: UpdateStatusRequest):
+    project.add_status(stage=request.stage, message=request.message)
+    return {"message": "Status updated successfully"}
 
 if __name__ == "__main__":
     import uvicorn

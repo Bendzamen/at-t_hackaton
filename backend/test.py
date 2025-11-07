@@ -1,18 +1,19 @@
 import os
 import shutil
 from fastapi.testclient import TestClient
-from main import app, projects
+from unittest.mock import patch
+from main import app, project
 
 client = TestClient(app)
 
-DATA_DIR = "data/projects"
+DATA_DIR = "data/project"
 
 def setup_function():
     """ setup any state specific to the execution of the given function."""
     if os.path.exists(DATA_DIR):
         shutil.rmtree(DATA_DIR)
     os.makedirs(DATA_DIR)
-    projects.clear()
+    project.__init__()
 
 def teardown_function():
     """ teardown any state that was previously setup with a setup_function
@@ -21,7 +22,8 @@ def teardown_function():
     if os.path.exists(DATA_DIR):
         shutil.rmtree(DATA_DIR)
 
-def test_start_processing():
+@patch('main.trigger_langflow_with_file')
+def test_start_processing(mock_trigger_langflow):
     with open("test.pdf", "wb") as f:
         f.write(b"This is a test pdf.")
     
@@ -32,66 +34,56 @@ def test_start_processing():
 
     assert response.status_code == 200
     json_response = response.json()
-    assert "project_id" in json_response
-    project_id = json_response["project_id"]
+    assert json_response == {"message": "Processing started"}
     
-    project_dir = os.path.join(DATA_DIR, project_id)
-    assert os.path.isdir(project_dir)
-    assert os.path.isfile(os.path.join(project_dir, "concept.pdf"))
-    assert os.path.isfile(os.path.join(project_dir, "history.json"))
+    assert os.path.isdir(project.project_dir)
+    assert os.path.isfile(os.path.join(project.project_dir, "concept.pdf"))
+    assert os.path.isfile(os.path.join(project.project_dir, "history.json"))
+    code_dir = os.path.join(project.project_dir, "code")
+    assert os.path.isdir(code_dir)
+    assert os.path.isdir(os.path.join(code_dir, ".git"))
 
-def test_get_status_not_found():
-    response = client.post("/status", json={"project_id": "non-existent-id"})
-    assert response.status_code == 404
-    assert response.json() == {"detail": "Project not found"}
+    mock_trigger_langflow.assert_called_once()
+    assert f"Sent to langflow with code_dir: {project.code_dir}" in project.history
 
-def test_get_status_found():
+@patch('main.trigger_langflow_with_file')
+def test_get_status(mock_trigger_langflow):
     # First create a project
     with open("test.pdf", "wb") as f:
         f.write(b"This is a test pdf.")
     
     with open("test.pdf", "rb") as f:
-        response = client.post("/start", files={"file": ("test.pdf", f, "application/pdf")})
+        client.post("/start", files={"file": ("test.pdf", f, "application/pdf")})
     
     os.remove("test.pdf")
-    project_id = response.json()["project_id"]
 
     # Now get the status
-    response = client.post("/status", json={"project_id": project_id})
+    response = client.get("/status")
     assert response.status_code == 200
     json_response = response.json()
-    assert json_response["project_id"] == project_id
-    assert "history" in json_response
-    assert len(json_response["history"]) == 1
-    assert json_response["history"][0] == "Initial PDF submission"
+    assert len(json_response) == 2
+    assert json_response[0] == "Initial PDF submission"
 
-def test_add_status():
+@patch('main.trigger_langflow_with_file')
+def test_update_status(mock_trigger_langflow):
     # First create a project
     with open("test.pdf", "wb") as f:
         f.write(b"This is a test pdf.")
     
     with open("test.pdf", "rb") as f:
-        response = client.post("/start", files={"file": ("test.pdf", f, "application/pdf")})
+        client.post("/start", files={"file": ("test.pdf", f, "application/pdf")})
     
     os.remove("test.pdf")
-    project_id = response.json()["project_id"]
 
-    # Add a status
-    project = projects[project_id]
-    project.add_status(stage="test_stage", message="test_message")
-
-    # Now get the status
-    response = client.post("/status", json={"project_id": project_id})
+    # Update the status
+    response = client.post("/update-status", json={"stage": "test_stage", "message": "test_message"})
     assert response.status_code == 200
-    json_response = response.json()
-    assert len(json_response["history"]) == 2
-    assert json_response["history"][0] == "Initial PDF submission"
-    iteration = json_response["history"][1]
-    assert "status_list" in iteration
-    assert "commit_id" in iteration
-    assert iteration["commit_id"] is None
-    assert len(iteration["status_list"]) == 1
-    status = iteration["status_list"][0]
+    assert response.json() == {"message": "Status updated successfully"}
+
+    # Check the status
+    assert len(project.history) == 3
+    iteration = project.history[-1]
+    assert len(iteration.status_list) == 1
+    status = iteration.status_list[0]
     assert status["stage"] == "test_stage"
     assert status["message"] == "test_message"
-    assert status["index"] == 0
