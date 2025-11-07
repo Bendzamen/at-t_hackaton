@@ -4,6 +4,8 @@ import os
 from project import Project
 from pydantic import BaseModel
 from langflow_client import trigger_langflow_with_file
+import shutil
+from starlette.responses import FileResponse
 
 app = FastAPI()
 
@@ -20,13 +22,20 @@ async def start_processing(file: UploadFile = File(...)):
     
     # Trigger Langflow
     trigger_langflow_with_file(file_path, project.code_dir)
-    project.add_prompt(f"Sent to langflow with code_dir: {project.code_dir}")
 
     return {"message": "Processing started"}
 
 @app.get("/status")
 async def get_status():
-    return jsonable_encoder(project.history)
+    history = []
+    for item in project.history:
+        if isinstance(item, str):
+            if item == f"Sent to langflow with code_dir: {project.code_dir}":
+                continue
+            history.append(item)
+        else:
+            history.append(item.status_list)
+    return jsonable_encoder(history)
 
 class UpdateStatusRequest(BaseModel):
     stage: str
@@ -36,6 +45,17 @@ class UpdateStatusRequest(BaseModel):
 async def update_status(request: UpdateStatusRequest):
     project.add_status(stage=request.stage, message=request.message)
     return {"message": "Status updated successfully"}
+
+@app.post("/iteration-done")
+async def iteration_done():
+    project.add_status(stage="Finished", message="Iteration complete", zip_result="/zip-download")
+    project.history[-1].commit()
+    return {"message": "Iteration marked as done"}
+
+@app.get("/zip-download")
+async def zip_download():
+    shutil.make_archive("code", 'zip', project.code_dir)
+    return FileResponse("code.zip", media_type='application/zip', filename='code.zip')
 
 if __name__ == "__main__":
     import uvicorn
