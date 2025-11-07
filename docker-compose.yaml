@@ -1,0 +1,21 @@
+services:
+  langflow:
+    build:
+      context: ./langflow
+    image: local/langflow-with-tools:1.0
+    container_name: langflow
+    restart: unless-stopped
+    ports:
+      - "7860:7860"
+    environment:
+      LANGFLOW_COMPONENTS_PATH: /app/components
+      LANGFLOW_DATABASE_URL: sqlite:////app/data/langflow.db
+    volumes:
+      - ./components:/app/components:ro
+      - ./workspace:/app/workspace
+      - ./data:/app/data
+    security_opt:
+      - no-new-privileges:true
+    ulimits:
+      nproc: 1024
+      nofile: 65536
