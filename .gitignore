@@ -1,2 +1,4 @@
 .env
 .DS_Store
+backend/venv
+backend/data
