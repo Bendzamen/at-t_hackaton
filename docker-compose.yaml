@@ -1,8 +1,6 @@
 services:
   langflow:
-    build:
-      context: ./langflow
-    image: local/langflow-with-tools:1.0
+    image: langflowai/langflow:1.6.5
     container_name: langflow
     restart: unless-stopped
     ports:
@@ -11,7 +9,7 @@ services:
       LANGFLOW_COMPONENTS_PATH: /app/components
       LANGFLOW_DATABASE_URL: sqlite:////app/data/langflow.db
     volumes:
-      - ./components:/app/components:ro
+      - ./components:/app/components
       - ./workspace:/app/workspace
       - ./data:/app/data
     security_opt:

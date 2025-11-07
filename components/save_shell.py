@@ -1,25 +1,28 @@
-from langflow.custom import Component
-import subprocess, shlex, pathlib, os
+from langflow.custom import CustomComponent
+from langflow.schema import Data
+import subprocess, shlex, pathlib
 
 # Allow-list only what you really need
-ALLOWED = {"ls", "cat", "git", "python", "pytest", "ruff", "node", "npm", "rg"}
+ALLOWED = {"ls", "cat", "git", "python", "pytest", "ruff", "node", "npm", "rg", "pip"}
 WORKDIR = pathlib.Path("/app/workspace").resolve()
 
-class SafeShell(Component):
+
+class SafeShell(CustomComponent):
     display_name = "Safe Shell"
     description = "Run approved shell commands in the sandboxed workspace."
-    inputs = [{"name": "command", "type": "str", "required": True, "display_name": "Command"}]
-    outputs = [{"name": "result", "type": "str"}]
 
-    def run(self, command: str):
-        # basic parsing of the binary being requested
+    def build_config(self):
+        return {"command": {"display_name": "Command", "value": "", "info": f"Allowed: {', '.join(sorted(ALLOWED))}"}}
+
+    def build(self) -> Data:
+        command = getattr(self, "command", "")
         try:
             exe = shlex.split(command)[0]
         except Exception:
-            return "Rejected: could not parse command."
+            return Data(value="Error: Could not parse command")
 
         if exe not in ALLOWED:
-            return f"Rejected: '{exe}' is not in allow-list."
+            return Data(value=f"Error: '{exe}' not allowed. Allowed: {', '.join(sorted(ALLOWED))}")
 
         try:
             proc = subprocess.run(
@@ -29,14 +32,15 @@ class SafeShell(Component):
                 capture_output=True,
                 text=True,
                 timeout=25,
-                env={}  # empty env for safety; add whitelisted vars if needed
+                env={"PATH": "/usr/local/bin:/usr/bin:/bin", "HOME": str(WORKDIR)}
             )
             output = (proc.stdout or "") + (proc.stderr or "")
-            # Trim overly long output to avoid overwhelming the LLM
             if len(output) > 8000:
                 output = output[:8000] + "\n[truncated]"
-            return output
+            result = output if output.strip() else f"(no output, exit code: {proc.returncode})"
+            return Data(value=result)
         except subprocess.TimeoutExpired:
-            return "Command timed out after 25s."
+            return Data(value="Error: Command timed out after 25s")
         except Exception as e:
-            return f"Error: {e}"
+            return Data(value=f"Error: {e}")
+
