@@ -8,6 +8,7 @@ services:
     environment:
       LANGFLOW_COMPONENTS_PATH: /app/components
       LANGFLOW_DATABASE_URL: sqlite:////app/data/langflow.db
+      ALLOWED_SHELL_COMMANDS: "ls,cat,git,python,pytest,ruff,node,npm,rg,pip,echo,mkdir,rmdir,rm,cp,mv,curl,make,docker,docker-compose"
     volumes:
       - ./components:/app/components
       - ./workspace:/app/workspace
@@ -15,5 +16,5 @@ services:
     security_opt:
       - no-new-privileges:true
     ulimits:
-      nproc: 1024
+      #nproc: 1024
       nofile: 65536
